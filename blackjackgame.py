@@ -36,6 +36,7 @@ class person:
             loc = self.simplehand.index(11)
             self.hand[loc] = "{}{}".format(str(1),self.hand[loc][-1])
 
+
     @property
     def simplehand(self):
         h = [c[:-1] for c in self.hand]
@@ -46,6 +47,10 @@ class person:
         h = [int(x) if x != 'A' else 11 for x in h]
         return h
     
+    @property
+    def displayhand(self):
+        return [x.replace('1', 'A') if '10' not in x else x for x in self.hand]
+
     @property
     def handscore(self):
         return sum(self.simplehand)
@@ -74,6 +79,7 @@ class player(person):
         player.playturn = 0
     
     def handsplit(self, playerobject):
+        #To do: Not working
         c = self.simplehand
         if (c[0] == c[1]) and (len(c) == 2):
             self.bet(handsplit=True)
@@ -98,6 +104,7 @@ class player(person):
             player.playturn = 0            
             
     def playactions(self, action, deckobject, playerobject):
+        # To do: Display possible actions
         if action == 'h':
             self.hit(deckobject)
         elif action == 's':
@@ -152,25 +159,50 @@ class table:
             self.play[0].carddraw(self.deck)
             self.deal.carddraw(self.deck)
         
+        # To do: Check for blackjack
+
         print("Dealer : {}".format(self.deal.dealerhand))
-        print("Player : {}".format(self.play[0].hand))
+        print("Player : {}".format(self.play[0].displayhand))
 
     def playerround(self):
         while player.playturn == 1:
             a = input("Action:")
             self.play[0].playactions(a,self.deck, self.play)
-            print(self.play[0].hand)
-            self.play[0].checkbust()        
+            print(self.play[0].displayhand)
+            self.play[0].checkbust()
+
+    def dealerround(self):
+        while self.deal.handscore < 17:
+            self.deal.carddraw(self.deck) 
+            self.deal.checkace()
+            print(self.deal.displayhand)
+
 
     def endround(self):
+        print("{} vs {}".format(self.play[0].displayhand, self.deal.displayhand))
+        if self.play[0].handscore <= 21:
+            if (self.play[0].handscore > self.deal.handscore) or (self.deal.handscore > 21):
+                print("Player Wins")
+                player.chips += self.play[0].pot * 2
+            elif self.play[0].handscore < self.deal.handscore:
+                print("Dealer Wins")
+            else:
+                print("Push")
+                player.chips += self.play[0].pot
+        else:
+            print("Dealer Wins")
+        
+        self.play[0].pot = 0
         self.play[0].hand = []
         self.deal.hand = []
-
-        a = input("Continue:")
+        
+        print(player.chips)
+        a = input("Continue? (y/n):")
         if a.lower() == 'n':
             table.playing = 0
         elif a.lower() == 'y':
             pass
+            #To do: set new betting
 
 
 def __main__():
@@ -178,8 +210,18 @@ def __main__():
     while table.playing == 1:
         t.newround()
         t.playerround()
+        t.dealerround()
         t.endround()
+    print("End with ${}".format(player.chips))
+    input("Any key to quit")
 
 __main__()
 
-
+#Other 'to do'
+#Cant bet more then owned
+#Dealer/player win count
+#Table count (simple speed count)
+#Deck reset
+#Insurance
+#Pair betting
+#Minimum bets / integer number

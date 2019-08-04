@@ -68,10 +68,9 @@ class player(person):
         player.currenthands += 1
         self.pot = 0
     
-    def bet(self, handsplit=False):
+    def bet(self):
         player.chips -= player.betamount
-        if handsplit == False:
-            self.pot += player.betamount
+        self.pot += player.betamount
         
     def hit(self, deckobject):
         self.carddraw(deckobject)
@@ -79,43 +78,40 @@ class player(person):
     def stand(self):
         print("Stand with {}".format(self.handscore))
         player.playturn = 0
-    
-    def handsplit(self, playerobject):
-        print("Function not available")
-        #To do: Not working
-        c = self.simplehand
-        if (c[0] == c[1]) and (len(c) == 2):
-            self.bet(handsplit=True)
-            i = player.currenthands
-            playerobject[i] = player()
-            playerobject[i-1].hand = self.hand[-1]
-            playerobject[i-1].pot = player.betamount
-            self.hand = self.hand[0]
-            
+
     def doubledown(self, deckobject):
         if len(self.hand) == 2:
             self.bet()
             self.carddraw(deckobject)
             player.playturn = 0
         else:
-            print("You cannot double down with more than 2 cards")
+            print("You cannot double down with more than two cards")
     
+    def surrender(self):
+        player.chips += self.pot / 2
+        player.playturn = 0
+
     def checkbust(self):
         self.checkace()
         if self.handscore > 21:
             print("Bust")
             player.playturn = 0      
 
-    def playactions(self, action, deckobject, playerobject):
+    def playactions(self, action, deckobject):
         a = action.lower()
         if a == 'h':
             self.hit(deckobject)
         elif a == 's':
             self.stand()
         elif a == 'sp':
-            self.handsplit(playerobject)
+            if self.hand[0][:-1] == self.hand[1][:-1]:
+                table.split = True
+            else:
+                print("You cannot split with two different cards")
         elif a == 'dd':
             self.doubledown(deckobject)
+        elif a == 'su':
+            self.surrender()
         else:
             print("No action selected")
 
@@ -149,10 +145,12 @@ class dealer(person):
         return sum(self.simplehand[1:])
 
 class table:
-    speedcount = 0
-    playing = 1
-    roundnumber = 0
-    sleeptime = 1
+    ## Variables
+    playing = True #When set to 0 the game will not continue into another round
+    roundnumber = 0 #To track the number of rounds that have been played
+    sleeptime = 0.75 #Total seconds that the script will sleep between actions
+    split = False #When set to True, the table will initialise a new hand
+    handsplayed = 0 #Count of hands played to check against number of player hands
 
     def __init__(self):
         self.deck = deck()
@@ -178,29 +176,48 @@ class table:
         if self.play[0].handscore == 21:
             player.playturn = 0
             player.chips += int(self.play[0].pot * 5/2)     
-        elif self.deal.dealerhand == 10:
+        elif self.deal.dealerhandscore == 11:
             self.checkinsurance()
    
     def checkinsurance(self):
-        a = input("Buy Insurance? (y/n)").lower()
+        print('=={YES: y};{NO: n}')
+        a = input("Buy Insurance? ").lower()
         if a == 'y':
-            #To Do: Set insurance pay"
-            print("Feature not implemented")
+            player.chips -= player.betamount / 2
 
         if self.deal.handscore == 21:
             print("Dealer has Blackjack")
+            if a == 'y':
+                player.chips + = player.betamount
             player.playturn = 0
         else:
             print("Dealer does not have Blackjack")
     
     def playerround(self):
         print('====PLAYER')
-        print('=={HIT: h};{STAND: s};{SPLIT: sp};{DOUBLE DOWN: dd}')
+        if self.handsplayed > 0:
+            print('Playing hand {}'.format(self.handsplayed + 1))
+            self.showhands(1,0,self.handsplayed)
+        print('=={HIT: h};{STAND: s};{SPLIT: sp};{DOUBLE DOWN: dd};{SURRENDER: su}')
         while player.playturn == 1:
-            a = input("Action:")
-            self.play[0].playactions(a,self.deck, self.play)
-            self.showhands(1,0)
-            self.play[0].checkbust()
+            a = input("Action: ")
+            self.play[self.handsplayed].playactions(a,self.deck)
+            if table.split == True:
+                self.splithands()
+            self.showhands(1,0,self.handsplayed)
+            self.play[self.handsplayed].checkbust()
+    
+    def splithands(self):
+        handnumber = player.currenthands + 1
+        player.chips -= player.betamount
+        self.play[handnumber] = player()
+        self.play[handnumber].hand = [self.play[self.handsplayed].hand[0]]
+        self.play[handnumber].pot = player.betamount
+        self.play[self.handsplayed].hand = [self.play[self.handsplayed].hand[-1]]
+        table.split=False
+        print('Split to additional hand: {}'. format(self.play[handnumber].hand))
+        print("Playing hand {}".format(self.handsplayed+1))
+
 
     def dealerround(self):
         print("====DEALER")
@@ -217,25 +234,31 @@ class table:
 
     def endround(self):
         print("======ROUND {} END".format(table.roundnumber))
+        self.showhands(0,1)
         sleep(table.sleeptime)
-        self.showhands(1,1)
-        sleep(table.sleeptime)
-        if self.play[0].handscore <= 21:
-            if (self.play[0].handscore > self.deal.handscore) or (self.deal.handscore > 21):
-                print("Player Wins")
-                player.chips += self.play[0].pot * 2
-            elif self.play[0].handscore < self.deal.handscore:
-                print("Dealer Wins")
+        for i in range(self.handsplayed):
+            if self.handsplayed > 1:
+                print("Hand {}".format(i+1))
+            self.showhands(1,0,i)
+            sleep(table.sleeptime)
+            if self.play[i].handscore <= 21:
+                if (self.play[i].handscore > self.deal.handscore) or (self.deal.handscore > 21):
+                    print("Player Wins")
+                    player.chips += self.play[i].pot * 2
+                elif self.play[i].handscore < self.deal.handscore:
+                    print("Dealer Wins")
+                else:
+                    print("Push")
+                    player.chips += self.play[i].pot
             else:
-                print("Push")
-                player.chips += self.play[0].pot
-        else:
-            print("Dealer Wins")
+                print("Dealer Wins")
         
     def resetround(self):
-        self.play[0].pot = 0
-        self.play[0].hand = []
+        for i in range(self.handsplayed):
+            self.play[i].pot = 0
+            self.play[i].hand = []
         self.deal.hand = []
+        self.handsplayed = 0
         
         if self.deck.decklen < deck.decknum * 52 * deck.shuffleproportion:
             self.deck = deck()
@@ -243,25 +266,25 @@ class table:
 
         print("Current chips: {}".format(player.chips))
         print("Current bet: {}".format(player.betamount))
-        setcontinue = 1
+        setcontinue = True
         print('=={YES: y};{NO: n};{CHANGE BET: b}')
-        while setcontinue == 1:
-            a = input("Continue?:").lower()
+        while setcontinue == True:
+            a = input("Continue?: ").lower()
             if a == 'n':
-                table.playing = 0
-                setcontinue = 0
+                table.playing = False
+                setcontinue = False
             elif a == 'b':
                 self.play[0].changebet()
-                setcontinue = 0
+                setcontinue = False
             elif a =='y':
-                setcontinue = 0
+                setcontinue = False
             else:
                 print("No action selected")
                 pass
     
-    def showhands(self, p, d):
+    def showhands(self, p, d, i=0):
         if p == 1:
-            print("Player Hand: {}".format(self.play[0].displayhand))
+            print("Player Hand: {}".format(self.play[i].displayhand))
         if d == 1:
             print("Dealer Hand: {}".format(self.deal.displayhand))
 
@@ -273,10 +296,15 @@ def __main__():
         sleep(table.sleeptime)
         
         t.newround()
-        t.playerround()
+
+        while t.handsplayed != player.currenthands + 1:
+            t.playerround()
+            t.handsplayed += 1
+            player.playturn = 1
+
         t.dealerround()
         t.endround()
-        
+
         sleep(table.sleeptime)
         t.resetround()
     
@@ -286,8 +314,13 @@ def __main__():
 __main__()
 
 #Other 'to do'
+#Surrender option
+#skipping dealer/payout step:
+    #double payout when have blackjack
+    #Dealer shouldnt play if player bust
 #Cant bet more then owned
+#minumum betting, specific chip values
 #Dealer/player win count
 #Table count (simple speed count)
 #Pair betting
-# Dealer shouldnt play if player bust
+

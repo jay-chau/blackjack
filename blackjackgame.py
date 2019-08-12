@@ -62,6 +62,7 @@ class player(person):
     chips = 1000
     betamount = 10
     playturn = 1
+    bustedhands = 0
     
     def __init__(self):
         super().__init__()
@@ -80,7 +81,7 @@ class player(person):
         player.playturn = 0
 
     def doubledown(self, deckobject):
-        if len(self.hand) == 2:
+        if len(self.hand) == 2 and player.chips - player.betamount > 0:
             self.bet()
             self.carddraw(deckobject)
             player.playturn = 0
@@ -90,12 +91,14 @@ class player(person):
     def surrender(self):
         player.chips += self.pot / 2
         player.playturn = 0
+        table.forcedealerwin = True
 
     def checkbust(self):
         self.checkace()
         if self.handscore > 21:
             print("Bust")
-            player.playturn = 0      
+            player.playturn = 0 
+            player.bustedhands += 1     
 
     def playactions(self, action, deckobject):
         a = action.lower()
@@ -104,7 +107,7 @@ class player(person):
         elif a == 's':
             self.stand()
         elif a == 'sp':
-            if self.hand[0][:-1] == self.hand[1][:-1]:
+            if self.hand[0][:-1] == self.hand[1][:-1] and player.chips - player.betamount > 0:
                 table.split = True
             else:
                 print("You cannot split with two different cards")
@@ -123,7 +126,11 @@ class player(person):
             a = input("Set new bet amount: ")
             try:
                 cls.betamount = int(a)
-                changingbet = 0
+                if cls.betamount > player.chips or cls.betamount <= 0:
+                    pass
+                else:
+                    print("Bet changed to {}".format(cls.betamount))
+                    changingbet = 0
             except:
                 print("Bet amount must be a number")
                 pass
@@ -151,6 +158,7 @@ class table:
     sleeptime = 0.75 #Total seconds that the script will sleep between actions
     split = False #When set to True, the table will initialise a new hand
     handsplayed = 0 #Count of hands played to check against number of player hands
+    forcedealerwin = False #skips dealer stage
 
     def __init__(self):
         self.deck = deck()
@@ -174,8 +182,7 @@ class table:
         sleep(table.sleeptime)
 
         if self.play[0].handscore == 21:
-            player.playturn = 0
-            player.chips += int(self.play[0].pot * 5/2)     
+            player.playturn = 0     
         elif self.deal.dealerhandscore == 11:
             self.checkinsurance()
    
@@ -183,29 +190,32 @@ class table:
         print('=={YES: y};{NO: n}')
         a = input("Buy Insurance? ").lower()
         if a == 'y':
-            player.chips -= player.betamount / 2
+            player.chips -= int(player.betamount / 2)
 
         if self.deal.handscore == 21:
             print("Dealer has Blackjack")
             if a == 'y':
-                player.chips + = player.betamount
+                player.chips += player.betamount
             player.playturn = 0
         else:
             print("Dealer does not have Blackjack")
     
     def playerround(self):
         print('====PLAYER')
-        if self.handsplayed > 0:
-            print('Playing hand {}'.format(self.handsplayed + 1))
-            self.showhands(1,0,self.handsplayed)
-        print('=={HIT: h};{STAND: s};{SPLIT: sp};{DOUBLE DOWN: dd};{SURRENDER: su}')
-        while player.playturn == 1:
-            a = input("Action: ")
-            self.play[self.handsplayed].playactions(a,self.deck)
-            if table.split == True:
-                self.splithands()
-            self.showhands(1,0,self.handsplayed)
-            self.play[self.handsplayed].checkbust()
+        if len(self.play[0].hand) == 2 and self.play[0].handscore == 21:
+            print("Blackjack")
+        else:
+            if self.handsplayed > 0:
+                print('Playing hand {}'.format(self.handsplayed + 1))
+                self.showhands(1,0,self.handsplayed)
+            print('=={HIT: h};{STAND: s};{SPLIT: sp};{DOUBLE DOWN: dd};{SURRENDER: su}')
+            while player.playturn == 1:
+                a = input("Action: ")
+                self.play[self.handsplayed].playactions(a,self.deck)
+                if table.split == True:
+                    self.splithands()
+                self.showhands(1,0,self.handsplayed)
+                self.play[self.handsplayed].checkbust()
     
     def splithands(self):
         handnumber = player.currenthands + 1
@@ -220,38 +230,45 @@ class table:
 
 
     def dealerround(self):
-        print("====DEALER")
-        self.showhands(0,1)
-        while self.deal.handscore < 17:
-            self.deal.carddraw(self.deck) 
-            self.deal.checkace()
-            self.showhands(0,1)                
-            sleep(table.sleeptime)
-        if self.deal.handscore <= 21:
-            print("Stand with {}".format(self.deal.handscore))
-        else:
-            print("Dealer Bust")
+        if table.forcedealerwin == False:
+            print("====DEALER")
+            self.showhands(0,1)
+            while self.deal.handscore < 17:
+                self.deal.carddraw(self.deck) 
+                self.deal.checkace()
+                self.showhands(0,1)                
+                sleep(table.sleeptime)
+            if self.deal.handscore <= 21:
+                print("Stand with {}".format(self.deal.handscore))
+            else:
+                print("Dealer Bust")
 
     def endround(self):
         print("======ROUND {} END".format(table.roundnumber))
-        self.showhands(0,1)
-        sleep(table.sleeptime)
-        for i in range(self.handsplayed):
-            if self.handsplayed > 1:
-                print("Hand {}".format(i+1))
-            self.showhands(1,0,i)
+        if table.forcedealerwin == False:
+            self.showhands(0,1)
             sleep(table.sleeptime)
-            if self.play[i].handscore <= 21:
-                if (self.play[i].handscore > self.deal.handscore) or (self.deal.handscore > 21):
-                    print("Player Wins")
-                    player.chips += self.play[i].pot * 2
-                elif self.play[i].handscore < self.deal.handscore:
-                    print("Dealer Wins")
-                else:
-                    print("Push")
-                    player.chips += self.play[i].pot
+            if len(self.play[0].hand) == 2 and self.play[0].handscore == 21:
+                player.chips += int(self.play[0].pot * 5/2)
             else:
-                print("Dealer Wins")
+                for i in range(self.handsplayed):
+                    if self.handsplayed > 1:
+                        print("Hand {}".format(i+1))
+                    self.showhands(1,0,i)
+                    sleep(table.sleeptime)
+                    if self.play[i].handscore <= 21:
+                        if (self.play[i].handscore > self.deal.handscore) or (self.deal.handscore > 21):
+                            print("Player Wins")
+                            player.chips += self.play[i].pot * 2
+                        elif self.play[i].handscore < self.deal.handscore:
+                            print("Dealer Wins")
+                        else:
+                            print("Push")
+                            player.chips += self.play[i].pot
+                    else:
+                        print("Dealer Wins")
+        else:
+            print("Dealer Wins")
         
     def resetround(self):
         for i in range(self.handsplayed):
@@ -259,6 +276,7 @@ class table:
             self.play[i].hand = []
         self.deal.hand = []
         self.handsplayed = 0
+        self.forcedealerwin = False
         
         if self.deck.decklen < deck.decknum * 52 * deck.shuffleproportion:
             self.deck = deck()
@@ -277,7 +295,10 @@ class table:
                 self.play[0].changebet()
                 setcontinue = False
             elif a =='y':
-                setcontinue = False
+                if player.chips - player.betamount < 0:
+                    pass
+                else:
+                    setcontinue = False
             else:
                 print("No action selected")
                 pass
@@ -301,7 +322,10 @@ def __main__():
             t.playerround()
             t.handsplayed += 1
             player.playturn = 1
-
+        
+        if player.bustedhands == player.currenthands and player.currenthands > 0:
+            t.forcedealerwin = True
+        
         t.dealerround()
         t.endround()
 
@@ -312,15 +336,3 @@ def __main__():
     input("Any key to quit")
 
 __main__()
-
-#Other 'to do'
-#Surrender option
-#skipping dealer/payout step:
-    #double payout when have blackjack
-    #Dealer shouldnt play if player bust
-#Cant bet more then owned
-#minumum betting, specific chip values
-#Dealer/player win count
-#Table count (simple speed count)
-#Pair betting
-

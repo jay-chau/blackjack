@@ -1,5 +1,7 @@
 from random import shuffle
 from time import sleep
+import urllib.request
+import codecs
 import csv
 
 class deck:
@@ -340,11 +342,12 @@ def welcome():
 def strategyreader():
     s = dict()
     i = 1
-    with open('strategy.csv') as file:
-        readfile = csv.reader(file, delimiter=',')
-        for row in readfile:
-            s[i] = row[1:]
-            i += 1
+    url = 'https://raw.githubusercontent.com/jay-chau/blackjack/master/strategy.csv'
+    urlfile = urllib.request.urlopen(url)
+    readfile = csv.reader(codecs.iterdecode(urlfile, 'utf-8'))
+    for row in readfile:
+        s[i] = row[1:]
+        i += 1
     return s
 
 def __main__():

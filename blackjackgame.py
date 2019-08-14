@@ -1,5 +1,6 @@
 from random import shuffle
 from time import sleep
+import csv
 
 class deck:
     decknum = 8
@@ -160,11 +161,15 @@ class table:
     handsplayed = 0 #Count of hands played to check against number of player hands
     forcedealerwin = False #skips dealer stage
 
-    def __init__(self):
+    def __init__(self, playerstrategy, runs):
+        
         self.deck = deck()
         self.play = dict()
         self.play[0] = player()
         self.deal = dealer()
+        
+        self.playerstrategy = playerstrategy
+        self.runs = int(runs)
         
     def newround(self):
         table.roundnumber += 1
@@ -188,7 +193,11 @@ class table:
    
     def checkinsurance(self):
         print('=={YES: y};{NO: n}')
-        a = input("Buy Insurance? ").lower()
+        if self.playerstrategy == None:
+            a = input("Buy Insurance? ").lower()
+        else:
+            a = 'n'
+            print("Buy Insurance? {}".format(a))
         if a == 'y':
             player.chips -= int(player.betamount / 2)
 
@@ -210,7 +219,11 @@ class table:
                 self.showhands(1,0,self.handsplayed)
             print('=={HIT: h};{STAND: s};{SPLIT: sp};{DOUBLE DOWN: dd};{SURRENDER: su}')
             while player.playturn == 1:
-                a = input("Action: ")
+                if self.playerstrategy == None:
+                    a = input("Action: ")
+                else:
+                    a = self.playerstrategy[self.play[self.handsplayed].handscore][self.deal.dealerhandscore - 2]
+                    print("Action: {}".format(a))
                 self.play[self.handsplayed].playactions(a,self.deck)
                 if table.split == True:
                     self.splithands()
@@ -287,7 +300,14 @@ class table:
         setcontinue = True
         print('=={YES: y};{NO: n};{CHANGE BET: b}')
         while setcontinue == True:
-            a = input("Continue?: ").lower()
+            if self.playerstrategy == None:
+                a = input("Continue?: ").lower()
+            elif self.runs > 1:
+                a = 'y'
+                self.runs -= 1
+            else:
+                a = 'n'
+
             if a == 'n':
                 table.playing = False
                 setcontinue = False
@@ -309,9 +329,34 @@ class table:
         if d == 1:
             print("Dealer Hand: {}".format(self.deal.displayhand))
 
+def welcome():
+    print("Welcome")
+    a = input("Play (p) or Simulation (s)? ").lower()
+    if a == 's':
+        return True
+    else:
+        return False
+
+def strategyreader():
+    s = dict()
+    i = 1
+    with open('strategy.csv') as file:
+        readfile = csv.reader(file, delimiter=',')
+        for row in readfile:
+            s[i] = row[1:]
+            i += 1
+    return s
 
 def __main__():
-    t = table()
+    s = welcome()
+    if s == True:
+        strategy = strategyreader()
+        runs = input("Number of Rounds? ")
+    else:
+        strategy = None
+        runs = 0
+
+    t = table(strategy, runs)
     while table.playing == 1:
         print("======ROUND {}".format(table.roundnumber + 1))
         sleep(table.sleeptime)

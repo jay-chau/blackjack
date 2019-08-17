@@ -185,7 +185,8 @@ class table:
 
         self.showhands(1,0)
         sleep(table.sleeptime)
-        print("Dealer : {}".format(self.deal.dealerhand))
+        print("==Dealer")
+        handgraphic(self.deal.dealerhand)
         sleep(table.sleeptime)
 
         if self.play[0].handscore == 21:
@@ -324,12 +325,14 @@ class table:
             else:
                 print("No action selected")
                 pass
-    
+
     def showhands(self, p, d, i=0):
         if p == 1:
-            print("Player Hand: {}".format(self.play[i].displayhand))
+            print("==Player")
+            handgraphic(self.play[i].displayhand)
         if d == 1:
-            print("Dealer Hand: {}".format(self.deal.displayhand))
+            print("==Dealer")
+            handgraphic(self.deal.displayhand)
 
 def welcome():
     print("Welcome")
@@ -349,6 +352,42 @@ def strategyreader():
         s[i] = row[1:]
         i += 1
     return s
+
+def cardgraphic(card, suit):
+    dotmap = {
+        'A': [5],
+        '2': [2,8],
+        '3': [2,5,8],
+        '4': [1,3,7,9],
+        '5': list(range(1,11,2)),
+        '6': [1,3,4,6,7,9],
+        '7': [1,3,4,5,6,7,9],
+        '8': [1,2,3,4,6,7,8,9],
+        '9' : list(range(1,10)),
+        '10' : [10],
+        'J' : [10],
+        'Q' : [10],
+        'K' : [10]
+    }
+
+    dots = [' ']*10
+    for p in dotmap[card]:
+        dots[p-1] = suit
+
+    return('┌───────┐',
+    '│{0: <2}{1: >1}{2: <1}{3: <3}│'.format(card,dots[0],dots[1],dots[2]),
+    '│{0: <2}{1: >1}{2: >1}{3: <2}{0: >1}│'.format(dots[9],dots[3],dots[4],dots[5]),
+    '│{1: >3}{2: <1}{3: <1}{0: >2}│'.format(card,dots[6],dots[7],dots[8]),
+    '└───────┘')
+
+def handgraphic(hand):
+    cards=[[],[],[],[],[]]
+    for c in range(len(hand)):
+        card = cardgraphic(hand[c][:-1], hand[c][-1])
+        for i in range(5):
+            cards[i].append(card[i])
+    for n in range(5):
+        print(','.join(cards[n]))
 
 def __main__():
     s = welcome()
